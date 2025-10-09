@@ -1,10 +1,12 @@
 let currentArtworks = [];
 let artistsList = [];
+let subjectsList = [];
 
 // Initialize on page load
 window.addEventListener("DOMContentLoaded", () => {
   fetchRandomArt();
   fetchArtists();
+  fetchSubjects();
   setupEventListeners();
 });
 
@@ -14,7 +16,10 @@ function setupEventListeners() {
     .addEventListener("click", fetchRandomArt);
   document
     .getElementById("artistButton")
-    .addEventListener("click", toggleDropdown);
+    .addEventListener("click", () => toggleDropdown("artist"));
+  document
+    .getElementById("subjectButton")
+    .addEventListener("click", () => toggleDropdown("subject"));
   document.getElementById("modalClose").addEventListener("click", closeModal);
 
   // Close modal when clicking outside
@@ -25,9 +30,17 @@ function setupEventListeners() {
   });
 }
 
-function toggleDropdown() {
-  const dropdown = document.getElementById("artistDropdown");
-  dropdown.classList.toggle("hidden");
+function toggleDropdown(type) {
+  const artistDropdown = document.getElementById("artistDropdown");
+  const subjectDropdown = document.getElementById("subjectDropdown");
+
+  if (type === "artist") {
+    artistDropdown.classList.toggle("hidden");
+    subjectDropdown.classList.add("hidden");
+  } else if (type === "subject") {
+    subjectDropdown.classList.toggle("hidden");
+    artistDropdown.classList.add("hidden");
+  }
 }
 
 async function fetchArtists() {
@@ -45,22 +58,50 @@ async function fetchArtists() {
     ].sort();
 
     artistsList = uniqueArtists;
-    populateDropdown(uniqueArtists);
+    populateDropdown(uniqueArtists, "artist");
   } catch (error) {
     console.error("Error fetching artists:", error);
   }
 }
 
-function populateDropdown(artists) {
-  const dropdown = document.getElementById("artistDropdown");
+async function fetchSubjects() {
+  try {
+    const res = await fetch(
+      "https://api.artic.edu/api/v1/artworks?page=1&limit=100&fields=id,title,subject_titles,image_id"
+    );
+    const json = await res.json();
+
+    // Get unique subjects from all artworks and sort alphabetically
+    const allSubjects = json.data
+      .flatMap((art) => art.subject_titles || [])
+      .filter((subject) => subject);
+
+    const uniqueSubjects = [...new Set(allSubjects)].sort();
+
+    subjectsList = uniqueSubjects;
+    populateDropdown(uniqueSubjects, "subject");
+  } catch (error) {
+    console.error("Error fetching subjects:", error);
+  }
+}
+
+function populateDropdown(items, type) {
+  const dropdownId = type === "artist" ? "artistDropdown" : "subjectDropdown";
+  const dropdown = document.getElementById(dropdownId);
   dropdown.innerHTML = "";
 
-  artists.forEach((artist) => {
-    const item = document.createElement("div");
-    item.className = "dropdown-item";
-    item.textContent = artist;
-    item.addEventListener("click", () => fetchArtworksByArtist(artist));
-    dropdown.appendChild(item);
+  items.forEach((item) => {
+    const element = document.createElement("div");
+    element.className = "dropdown-item";
+    element.textContent = item;
+    element.addEventListener("click", () => {
+      if (type === "artist") {
+        fetchArtworksByArtist(item);
+      } else if (type === "subject") {
+        fetchArtworksBySubject(item);
+      }
+    });
+    dropdown.appendChild(element);
   });
 }
 
@@ -141,6 +182,52 @@ async function fetchArtworksByArtist(artistName) {
     document.getElementById("artistDropdown").classList.add("hidden");
   } catch (error) {
     console.error("Error fetching artworks by artist:", error);
+  }
+}
+
+async function fetchArtworksBySubject(subjectName) {
+  try {
+    const res = await fetch(
+      `https://api.artic.edu/api/v1/artworks/search?q=${encodeURIComponent(
+        subjectName
+      )}&limit=100&fields=id,title,artist_title,image_id,date_display,subject_titles`
+    );
+    const json = await res.json();
+    const iiifBase = "https://www.artic.edu/iiif/2";
+
+    const filtered = json.data.filter(
+      (art) =>
+        art.subject_titles &&
+        art.subject_titles.includes(subjectName) &&
+        art.image_id
+    );
+
+    if (filtered.length === 0) {
+      alert(`No artworks found for subject: ${subjectName}`);
+      return;
+    }
+
+    const selected = [];
+    const numToShow = Math.min(5, filtered.length);
+    const positions = generateNonOverlappingPositions(numToShow);
+
+    for (let i = 0; i < numToShow; i++) {
+      const artwork = filtered[i];
+      selected.push({
+        ...artwork,
+        imageUrl: `${iiifBase}/${artwork.image_id}/full/400,/0/default.jpg`,
+        largeImageUrl: `${iiifBase}/${artwork.image_id}/full/843,/0/default.jpg`,
+        style: positions[i],
+      });
+    }
+
+    currentArtworks = selected;
+    displayArtworks(selected);
+
+    // Close dropdown
+    document.getElementById("subjectDropdown").classList.add("hidden");
+  } catch (error) {
+    console.error("Error fetching artworks by subject:", error);
   }
 }
 
