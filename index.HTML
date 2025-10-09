@@ -1,19 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="style.css">
-    <title>My Website</title>
-</head>
-<body>
-    <h1>Art Institute of Chicago </h1>
-    <button id="genbutton"> Get Inspired</button>
-     <div id="gallery"></div>
-  <div id="modal">
-    <div id="modalClose">&times;</div>
-    <div id="modalContent"></div>
-  </div>
-    <script src="script.js"></script> 
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="style.css" />
+    <title>Art Institute of Chicago</title>
+  </head>
+  <body>
+    <div class="subtitle">
+      <p>Get inspired by</p>
+      <p>The Art Institute of Chicago</p>
+      <p>Explore By</p>
+    </div>
 
+    <div class="button-container">
+      <button id="randomButton">Random</button>
+      <div class="dropdown-wrapper">
+        <button id="artistButton">Artist</button>
+        <div id="artistDropdown" class="dropdown hidden"></div>
+      </div>
+    </div>
+
+    <div id="gallery"></div>
+
+    <div id="modal" class="modal hidden">
+      <div id="modalClose" class="modal-close">&times;</div>
+      <div id="modalContent" class="modal-content"></div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
 </html>
