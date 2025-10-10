@@ -2,7 +2,6 @@ let currentArtworks = [];
 let artistsList = [];
 let subjectsList = [];
 
-// Initialize on page load
 window.addEventListener("DOMContentLoaded", () => {
   fetchRandomArt();
   fetchArtists();
@@ -22,26 +21,43 @@ function setupEventListeners() {
     .addEventListener("click", () => toggleDropdown("subject"));
   document.getElementById("modalClose").addEventListener("click", closeModal);
 
-  // Close modal when clicking outside
-  document.getElementById("modal").addEventListener("click", (e) => {
-    if (e.target.id === "modal") {
+  // Close modal when clicking outside code snippet by Fabio Musanni from the following YouTube link https://www.youtube.com/watch?v=5vQntu9bZCM
+  const modal = document.getElementById("modal");
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) {
       closeModal();
     }
-  });
+  }); //Code snippet by Fabio Musanni ends here
 }
 
 function toggleDropdown(type) {
-  const artistDropdown = document.getElementById("artistDropdown");
-  const subjectDropdown = document.getElementById("subjectDropdown");
-
   if (type === "artist") {
-    artistDropdown.classList.toggle("hidden");
-    subjectDropdown.classList.add("hidden");
+    document.getElementById("artistDropdown").classList.toggle("hidden");
+    document.getElementById("subjectDropdown").classList.add("hidden");
   } else if (type === "subject") {
-    subjectDropdown.classList.toggle("hidden");
-    artistDropdown.classList.add("hidden");
+    document.getElementById("subjectDropdown").classList.toggle("hidden");
+    document.getElementById("artistDropdown").classList.add("hidden");
   }
 }
+
+// Close the dropdown menus if the user clicks outside of them code snippet adapted from W3Schools https://www.w3schools.com/howto/howto_js_dropdown.asp
+window.onclick = function (event) {
+  if (
+    !event.target.matches("#artistButton") &&
+    !event.target.matches("#subjectButton")
+  ) {
+    var dropdowns = document.querySelectorAll(
+      "#artistDropdown, #subjectDropdown"
+    );
+    var i;
+    for (i = 0; i < dropdowns.length; i++) {
+      var openDropdown = dropdowns[i];
+      if (!openDropdown.classList.contains("hidden")) {
+        openDropdown.classList.add("hidden");
+      }
+    }
+  }
+}; // W3Schools code snippet ends here
 
 async function fetchArtists() {
   try {
@@ -50,7 +66,7 @@ async function fetchArtists() {
     );
     const json = await res.json();
 
-    // Get unique artist names and sort alphabetically
+    // Get non duplicate artist names and sort alphabetically
     const uniqueArtists = [
       ...new Set(
         json.data.map((art) => art.artist_title).filter((name) => name)
@@ -71,7 +87,7 @@ async function fetchSubjects() {
     );
     const json = await res.json();
 
-    // Get unique subjects from all artworks and sort alphabetically
+    // Get non duplicate subjects from all artworks and sort alphabetically
     const allSubjects = json.data
       .flatMap((art) => art.subject_titles || [])
       .filter((subject) => subject);
@@ -231,6 +247,7 @@ async function fetchArtworksBySubject(subjectName) {
   }
 }
 
+//Used Claude AI to develop the following code, it provides a grid cells that shuffles and avoids the images to overlap.
 function generateNonOverlappingPositions(count) {
   const positions = [];
 
@@ -250,7 +267,7 @@ function generateNonOverlappingPositions(count) {
   // Shuffle the grid cells to randomize positions
   const shuffled = gridCells.sort(() => Math.random() - 0.5);
 
-  // Take the first 'count' cells and add random variation
+  // Take the first ¨count¨ cells and add random variation
   for (let i = 0; i < count; i++) {
     const cell = shuffled[i];
     positions.push({
@@ -261,7 +278,7 @@ function generateNonOverlappingPositions(count) {
   }
 
   return positions;
-}
+} // Claude AI code ends here
 
 function displayArtworks(artworks) {
   const gallery = document.getElementById("gallery");
