@@ -3,35 +3,59 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gallery Guru | The Art Institute of Chicago Quiz</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;600;700&display=swap"
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Merriweather:ital,opsz,wght@0,18..144,300..900;1,18..144,300..900&display=swap" 
+      rel="stylesheet">
+    
     <link rel="stylesheet" href="style.css" />
-    <title>Art Institute of Chicago</title>
   </head>
   <body>
-    <div class="subtitle">
-      <p>Get inspired by</p>
-      <p>The Art Institute of Chicago</p>
-      <p>Explore By</p>
+    <header class="header">
+      <div class="branding">
+        <img src="logo.jpeg" alt="Gallery Guru Logo" class="logo" />
+        <h1 class="site-title">Gallery Guru</h1>
+      </div>
+      
+    </header>
+<p class="tagline">
+  Test your art knowledge — powered by the Art Institute of Chicago API
+</p>
+<p class="instruction">Match each artwork to its respective artist. For answers, double-click the artworks.</p>
+    <main>
+      <div class="game-container active" id="gameContainer">
+        <div class="artworks-section" id="artworksSection">
+        </div>
+        <div class="artists-section" id="artistsSection"></div>
+      </div>
+
+      <canvas id="lineCanvas"></canvas>
+
+      <div class="controls" id="controls">
+        <button class="control-button" onclick="checkAnswers()">Check Answers</button>
+        <button class="control-button" onclick="playNextRound()">Play Next Round</button>
+      </div>
+    </main>
+
+    <div id="modal" class="modal">
+      <div class="modal-content">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <h2 id="modalTitle"></h2>
+        <img id="modalImage" class="modal-image" src="" alt="" />
+        <div id="modalDetails"></div>
+      </div>
     </div>
 
-    <div class="button-container">
-      <button id="randomButton">Random</button>
-      <div class="dropdown-wrapper">
-        <button id="artistButton">Artist</button>
-        <div id="artistDropdown" class="dropdown hidden"></div>
+    <div id="popup" class="popup">
+      <div class="popup-content">
+        <p id="popupMessage"></p>
+        <button class="popup-button" onclick="closePopup()">Close</button>
       </div>
-      <div class="dropdown-wrapper">
-        <button id="subjectButton">Subject</button>
-        <div id="subjectDropdown" class="dropdown hidden"></div>
-      </div>
-    </div>
-
-    <div id="gallery"></div>
-
-    <div id="modal" class="modal hidden">
-      <div id="modalClose" class="modal-close">&times;</div>
-      <div id="modalContent" class="modal-content"></div>
     </div>
 
     <script src="script.js"></script>
   </body>
 </html>
+
