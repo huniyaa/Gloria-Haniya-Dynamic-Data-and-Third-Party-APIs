@@ -1,314 +1,407 @@
 let currentArtworks = [];
-let artistsList = [];
-let subjectsList = [];
+let userMatches = {};
+let selectedArtwork = null;
+let canvas, ctx;
 
 window.addEventListener("DOMContentLoaded", () => {
-  fetchRandomArt();
-  fetchArtists();
-  fetchSubjects();
-  setupEventListeners();
+  console.log("Page loaded, starting game...");
+  setupCanvas();
+  fetchRandomArtworks();
 });
 
-function setupEventListeners() {
-  document
-    .getElementById("randomButton")
-    .addEventListener("click", fetchRandomArt);
-  document
-    .getElementById("artistButton")
-    .addEventListener("click", () => toggleDropdown("artist"));
-  document
-    .getElementById("subjectButton")
-    .addEventListener("click", () => toggleDropdown("subject"));
-  document.getElementById("modalClose").addEventListener("click", closeModal);
+function setupCanvas() {
+  canvas = document.getElementById("lineCanvas");
+  if (!canvas) {
+    console.error("Canvas element not found!");
+    return;
+  }
+  ctx = canvas.getContext("2d");
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas);
+}
 
-  // Close modal when clicking outside code snippet by Fabio Musanni from the following YouTube link https://www.youtube.com/watch?v=5vQntu9bZCM
-  const modal = document.getElementById("modal");
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) {
-      closeModal();
+function resizeCanvas() {
+  const gameContainer = document.getElementById("gameContainer");
+  if (!gameContainer || !canvas) return;
+  
+  
+  const containerRect = gameContainer.getBoundingClientRect();
+  canvas.style.position = 'absolute';
+  canvas.style.top = `${containerRect.top}px`;
+  canvas.style.left = `${containerRect.left}px`;
+  canvas.width = containerRect.width;
+  canvas.height = containerRect.height;
+  
+  drawLines();
+}
+
+function drawLines() {
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = "#4CAF50";
+  ctx.lineWidth = 3;
+
+  Object.entries(userMatches).forEach(([artworkIndex, artistIndex]) => {
+    const artworkImg = document.querySelector(`[data-index="${artworkIndex}"]`);
+    const artistButton = document.querySelector(
+      `[data-artist-index="${artistIndex}"]`
+    );
+
+    if (artworkImg && artistButton) {
+      const artRect = artworkImg.getBoundingClientRect();
+      const artistRect = artistButton.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+
+      
+      const startX = artRect.left + artRect.width / 2 - canvasRect.left;
+      const startY = artRect.top + artRect.height / 2 - canvasRect.top;
+      
+      const endX = artistRect.left + artistRect.width / 2 - canvasRect.left;
+      const endY = artistRect.top + artistRect.height / 2 - canvasRect.top;
+
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
     }
-  }); //Code snippet by Fabio Musanni ends here
+  });
 }
+async function fetchRandomArtworks() {
+  console.log("Fetching artworks...");
+  try {
+    const randomPage = Math.floor(Math.random() * 50) + 1;
+    const url = `https://api.artic.edu/api/v1/artworks?page=${randomPage}&limit=100&fields=id,title,artist_title,image_id,date_display,place_of_origin,dimensions,description`;
 
-function toggleDropdown(type) {
-  if (type === "artist") {
-    document.getElementById("artistDropdown").classList.toggle("hidden");
-    document.getElementById("subjectDropdown").classList.add("hidden");
-  } else if (type === "subject") {
-    document.getElementById("subjectDropdown").classList.toggle("hidden");
-    document.getElementById("artistDropdown").classList.add("hidden");
-  }
-}
+    console.log("Fetching from:", url);
 
-// Close the dropdown menus if the user clicks outside of them code snippet adapted from W3Schools https://www.w3schools.com/howto/howto_js_dropdown.asp
-window.onclick = function (event) {
-  if (
-    !event.target.matches("#artistButton") &&
-    !event.target.matches("#subjectButton")
-  ) {
-    var dropdowns = document.querySelectorAll(
-      "#artistDropdown, #subjectDropdown"
-    );
-    var i;
-    for (i = 0; i < dropdowns.length; i++) {
-      var openDropdown = dropdowns[i];
-      if (!openDropdown.classList.contains("hidden")) {
-        openDropdown.classList.add("hidden");
-      }
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const data = await response.json();
+    console.log("API Response:", data);
+
+    const artworks = data.data;
+    const imageBase = data.config.iiif_url;
+
+    console.log("Image base URL:", imageBase);
+    console.log("Total artworks received:", artworks.length);
+
+    const selected = [];
+const positions = createPositions(5);
+const usedArtists = new Set(); 
+
+let tries = 0;
+for (let i = 0; i < 5 && tries < 100; i++) {
+  const random = artworks[Math.floor(Math.random() * artworks.length)];
+
+  
+  if (!random.image_id || !random.artist_title || usedArtists.has(random.artist_title)) {
+    console.log("Skipping artwork - missing image_id, artist_title, or duplicate artist");
+    i--;
+    tries++;
+    continue;
   }
-}; // W3Schools code snippet ends here
 
-async function fetchArtists() {
-  try {
-    const res = await fetch(
-      "https://api.artic.edu/api/v1/artworks?page=1&limit=100&fields=id,title,artist_title,image_id"
-    );
-    const json = await res.json();
-
-    // Get non duplicate artist names and sort alphabetically
-    const uniqueArtists = [
-      ...new Set(
-        json.data.map((art) => art.artist_title).filter((name) => name)
-      ),
-    ].sort();
-
-    artistsList = uniqueArtists;
-    populateDropdown(uniqueArtists, "artist");
-  } catch (error) {
-    console.error("Error fetching artists:", error);
-  }
-}
-
-async function fetchSubjects() {
-  try {
-    const res = await fetch(
-      "https://api.artic.edu/api/v1/artworks?page=1&limit=100&fields=id,title,subject_titles,image_id"
-    );
-    const json = await res.json();
-
-    // Get non duplicate subjects from all artworks and sort alphabetically
-    const allSubjects = json.data
-      .flatMap((art) => art.subject_titles || [])
-      .filter((subject) => subject);
-
-    const uniqueSubjects = [...new Set(allSubjects)].sort();
-
-    subjectsList = uniqueSubjects;
-    populateDropdown(uniqueSubjects, "subject");
-  } catch (error) {
-    console.error("Error fetching subjects:", error);
-  }
-}
-
-function populateDropdown(items, type) {
-  const dropdownId = type === "artist" ? "artistDropdown" : "subjectDropdown";
-  const dropdown = document.getElementById(dropdownId);
-  dropdown.innerHTML = "";
-
-  items.forEach((item) => {
-    const element = document.createElement("div");
-    element.className = "dropdown-item";
-    element.textContent = item;
-    element.addEventListener("click", () => {
-      if (type === "artist") {
-        fetchArtworksByArtist(item);
-      } else if (type === "subject") {
-        fetchArtworksBySubject(item);
-      }
-    });
-    dropdown.appendChild(element);
+  usedArtists.add(random.artist_title); 
+  selected.push({
+    ...random,
+    imageUrl: `${imageBase}/${random.image_id}/full/400,/0/default.jpg`,
+    largeImageUrl: `${imageBase}/${random.image_id}/full/843,/0/default.jpg`,
+    position: positions[i],
   });
 }
 
-async function fetchRandomArt() {
-  try {
-    const res = await fetch(
-      "https://api.artic.edu/api/v1/artworks?page=1&limit=100"
-    );
-    const json = await res.json();
-    const allArtworks = json.data;
-    const iiifBase = json.config.iiif_url;
+    console.log("Selected artworks:", selected);
 
-    const selected = [];
-    const positions = generateNonOverlappingPositions(5);
-
-    let attempts = 0;
-    for (let i = 0; i < 5 && attempts < 50; i++) {
-      const random =
-        allArtworks[Math.floor(Math.random() * allArtworks.length)];
-      if (!random.image_id) {
-        i--;
-        attempts++;
-        continue;
-      }
-
-      selected.push({
-        ...random,
-        imageUrl: `${iiifBase}/${random.image_id}/full/400,/0/default.jpg`,
-        largeImageUrl: `${iiifBase}/${random.image_id}/full/843,/0/default.jpg`,
-        style: positions[i],
-      });
+    if (selected.length === 0) {
+      console.error("No valid artworks found!");
+      return;
     }
 
     currentArtworks = selected;
+    userMatches = {};
     displayArtworks(selected);
+    displayArtists(selected);
+
+    console.log("Artworks displayed successfully");
   } catch (error) {
     console.error("Error fetching artworks:", error);
+    alert("Error loading artworks. Please check the console for details.");
   }
 }
 
-async function fetchArtworksByArtist(artistName) {
-  try {
-    const res = await fetch(
-      `https://api.artic.edu/api/v1/artworks/search?q=${encodeURIComponent(
-        artistName
-      )}&limit=100&fields=id,title,artist_title,image_id,date_display`
-    );
-    const json = await res.json();
-    const iiifBase = "https://www.artic.edu/iiif/2";
-
-    const filtered = json.data.filter(
-      (art) => art.artist_title === artistName && art.image_id
-    );
-
-    if (filtered.length === 0) {
-      alert(`No artworks found for ${artistName}`);
-      return;
-    }
-
-    const selected = [];
-    const numToShow = Math.min(5, filtered.length);
-    const positions = generateNonOverlappingPositions(numToShow);
-
-    for (let i = 0; i < numToShow; i++) {
-      const artwork = filtered[i];
-      selected.push({
-        ...artwork,
-        imageUrl: `${iiifBase}/${artwork.image_id}/full/400,/0/default.jpg`,
-        largeImageUrl: `${iiifBase}/${artwork.image_id}/full/843,/0/default.jpg`,
-        style: positions[i],
-      });
-    }
-
-    currentArtworks = selected;
-    displayArtworks(selected);
-
-    // Close dropdown
-    document.getElementById("artistDropdown").classList.add("hidden");
-  } catch (error) {
-    console.error("Error fetching artworks by artist:", error);
-  }
-}
-
-async function fetchArtworksBySubject(subjectName) {
-  try {
-    const res = await fetch(
-      `https://api.artic.edu/api/v1/artworks/search?q=${encodeURIComponent(
-        subjectName
-      )}&limit=100&fields=id,title,artist_title,image_id,date_display,subject_titles`
-    );
-    const json = await res.json();
-    const iiifBase = "https://www.artic.edu/iiif/2";
-
-    const filtered = json.data.filter(
-      (art) =>
-        art.subject_titles &&
-        art.subject_titles.includes(subjectName) &&
-        art.image_id
-    );
-
-    if (filtered.length === 0) {
-      alert(`No artworks found for subject: ${subjectName}`);
-      return;
-    }
-
-    const selected = [];
-    const numToShow = Math.min(5, filtered.length);
-    const positions = generateNonOverlappingPositions(numToShow);
-
-    for (let i = 0; i < numToShow; i++) {
-      const artwork = filtered[i];
-      selected.push({
-        ...artwork,
-        imageUrl: `${iiifBase}/${artwork.image_id}/full/400,/0/default.jpg`,
-        largeImageUrl: `${iiifBase}/${artwork.image_id}/full/843,/0/default.jpg`,
-        style: positions[i],
-      });
-    }
-
-    currentArtworks = selected;
-    displayArtworks(selected);
-
-    // Close dropdown
-    document.getElementById("subjectDropdown").classList.add("hidden");
-  } catch (error) {
-    console.error("Error fetching artworks by subject:", error);
-  }
-}
-
-//Used Claude AI to develop the following code, it provides a grid cells that shuffles and avoids the images to overlap.
-function generateNonOverlappingPositions(count) {
-  const positions = [];
-
-  // Define grid cells (3 rows x 3 columns = 9 possible positions)
-  const gridCells = [
-    { top: 5, left: 5 },
-    { top: 5, left: 37 },
-    { top: 5, left: 69 },
-    { top: 35, left: 5 },
-    { top: 35, left: 37 },
-    { top: 35, left: 69 },
-    { top: 65, left: 5 },
-    { top: 65, left: 37 },
-    { top: 65, left: 69 },
+function createPositions(count) {
+  
+  const grid = [
+    { top: 15, left: 9 },   
+    { top: 15, left: 50 },   
+    { top: 15, left: 75 },   
+    { top: 40, left: 15 },   
+    { top: 40, left: 75 },   
+    { top: 65, left: 15 },   
+    { top: 65, left: 50 },   
+    { top: 65, left: 75 }    
   ];
 
-  // Shuffle the grid cells to randomize positions
-  const shuffled = gridCells.sort(() => Math.random() - 0.5);
+  const shuffled = grid.sort(() => Math.random() - 0.5);
+  const positions = [];
 
-  // Take the first ¨count¨ cells and add random variation
   for (let i = 0; i < count; i++) {
     const cell = shuffled[i];
     positions.push({
-      top: cell.top + Math.random() * 10 - 5, // Add small random offset
-      left: cell.left + Math.random() * 10 - 5,
-      rotation: Math.random() * 6 - 3,
+      top: cell.top,
+      left: cell.left,
+      rotation: Math.random() * 6 - 3
     });
   }
 
   return positions;
-} // Claude AI code ends here
+}
 
 function displayArtworks(artworks) {
-  const gallery = document.getElementById("gallery");
-  gallery.innerHTML = "";
+  console.log("Displaying artworks...");
+  const section = document.getElementById("artworksSection");
 
-  artworks.forEach((art, idx) => {
+  if (!section) {
+    console.error("Artworks section not found!");
+    return;
+  }
+
+  
+  section.innerHTML = ''; 
+
+  artworks.forEach((art, index) => {
     const img = document.createElement("img");
     img.src = art.imageUrl;
     img.alt = art.title;
-    img.style.top = `${art.style.top}%`;
-    img.style.left = `${art.style.left}%`;
-    img.style.transform = `rotate(${art.style.rotation}deg)`;
+    img.className = "artwork-img";
+    img.dataset.index = index;
+    img.style.top = `${art.position.top}%`;
+    img.style.left = `${art.position.left}%`;
+    img.style.transform = `rotate(${art.position.rotation}deg)`;
 
-    img.addEventListener("click", () => showModal(art));
+    img.addEventListener("click", (e) => {
+      e.stopPropagation();
+      selectArtwork(index);
+    });
 
-    gallery.appendChild(img);
+    img.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      showModal(art);
+    });
+
+    img.onerror = () => {
+      console.error("Failed to load image:", art.imageUrl);
+    };
+
+    section.appendChild(img);
+  });
+
+  console.log("Images added to DOM");
+}
+
+
+function displayArtists(artworks) {
+  console.log("Displaying artists...");
+  const section = document.getElementById("artistsSection");
+
+  if (!section) {
+    console.error("Artists section not found!");
+    return;
+  }
+
+  section.innerHTML = "";
+
+  
+  const artists = artworks.map((art, index) => ({
+    name: art.artist_title,
+    originalIndex: index,
+    artworkId: art.id 
+  }));
+
+ 
+  const shuffledArtists = [...artists].sort(() => Math.random() - 0.5);
+
+  shuffledArtists.forEach((artist) => {
+    const button = document.createElement("button");
+    button.className = "artist-button";
+    button.textContent = artist.name;
+    button.dataset.artistIndex = artist.originalIndex;
+    button.dataset.artworkId = artist.artworkId;
+    button.addEventListener("click", () =>
+      selectArtist(artist.originalIndex, button)
+    );
+    section.appendChild(button);
+  });
+
+  console.log("Artist buttons created with proper mapping");
+}
+
+function selectArtwork(index) {
+  document.querySelectorAll(".artwork-img").forEach((img) => {
+    img.classList.remove("selected");
+  });
+
+  const img = document.querySelector(`[data-index="${index}"]`);
+  img.classList.add("selected");
+  selectedArtwork = index;
+}
+
+function selectArtist(artistIndex, button) {
+  if (selectedArtwork === null) {
+    showPopup("Please select an artwork first!");
+    return;
+  }
+
+ 
+  userMatches[selectedArtwork] = {
+    artistIndex: artistIndex,
+    artworkId: parseInt(button.dataset.artworkId)
+  };
+
+  document.querySelectorAll(".artwork-img").forEach((img) => {
+    img.classList.remove("selected");
+  });
+
+  selectedArtwork = null;
+  drawLines();
+}
+function drawLines() {
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = "#4CAF50";
+  ctx.lineWidth = 2; 
+
+  Object.entries(userMatches).forEach(([artworkIndex, matchData]) => {
+    const artworkImg = document.querySelector(`[data-index="${artworkIndex}"]`);
+    const artistButton = document.querySelector(
+      `[data-artist-index="${matchData.artistIndex}"]`
+    );
+
+    if (artworkImg && artistButton) {
+      const artRect = artworkImg.getBoundingClientRect();
+      const artistRect = artistButton.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+
+     
+      const startX = artRect.right - canvasRect.left;
+      const startY = artRect.top + artRect.height / 2 - canvasRect.top;
+      
+      
+      const endX = artistRect.left - canvasRect.left - 5; 
+      const endY = artistRect.top + artistRect.height / 2 - canvasRect.top;
+
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+    }
   });
 }
 
+function checkAnswers() {
+  if (Object.keys(userMatches).length !== currentArtworks.length) {
+    showPopup("Please match all artworks before checking!");
+    return;
+  }
+
+  let allCorrect = true;
+  let correctCount = 0;
+  
+  Object.entries(userMatches).forEach(([artworkIndex, matchData]) => {
+    const artwork = currentArtworks[artworkIndex];
+    
+    if (artwork.id === matchData.artworkId) {
+      correctCount++;
+    } else {
+      allCorrect = false;
+    }
+  });
+
+  if (allCorrect) {
+    showPopup(`Perfect! All ${correctCount} matches are correct! 🎉`);
+    document.querySelectorAll(".artist-button").forEach((btn) => {
+      btn.classList.add("matched");
+    });
+  } else {
+    showPopup(`${correctCount} out of ${currentArtworks.length} correct. Try again!`);
+  }
+}
+
+
+function playNextRound() {
+  
+  if (ctx) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  
+  
+  userMatches = {};
+  selectedArtwork = null;
+  
+  
+  fetchRandomArtworks();
+}
+
 function showModal(artwork) {
-  const modalContent = document.getElementById("modalContent");
-  modalContent.innerHTML = `
-        <img src="${artwork.largeImageUrl}" alt="${artwork.title}">
-        <h2>${artwork.title}</h2>
-        <p><strong>Artist:</strong> ${artwork.artist_title || "Unknown"}</p>
-        <p><strong>Date:</strong> ${artwork.date_display || "n.d."}</p>
+  document.getElementById("modalTitle").textContent = artwork.title;
+  document.getElementById("modalImage").src = artwork.largeImageUrl;
+
+  const desc = artwork.description
+    ? artwork.description.replace(/<[^>]*>/g, "")
+    : "No description available";
+
+ 
+  document.getElementById("modalDetails").innerHTML = `
+        <div class="info-section">
+            <strong>Artist:</strong>
+            <span>${artwork.artist_title || "Unknown"}</span>
+        </div>
+        <div class="info-section">
+            <strong>Description:</strong>
+            <span>${desc}</span>
+        </div>
+        <div class="info-section">
+            <strong>Date Displayed:</strong>
+            <span>${artwork.date_display || "n.d."}</span>
+        </div>
+        <div class="info-section">
+            <strong>Place of Origin:</strong>
+            <span>${artwork.place_of_origin || "Unknown"}</span>
+        </div>
+        <div class="info-section">
+            <strong>Dimensions:</strong>
+            <span>${artwork.dimensions || "Not available"}</span>
+        </div>
     `;
-  document.getElementById("modal").classList.remove("hidden");
+
+  document.getElementById("modal").classList.add("show");
 }
 
 function closeModal() {
-  document.getElementById("modal").classList.add("hidden");
+  document.getElementById("modal").classList.remove("show");
 }
+
+function showPopup(message) {
+  document.getElementById("popupMessage").textContent = message;
+  document.getElementById("popup").classList.add("show");
+}
+
+function closePopup() {
+  document.getElementById("popup").classList.remove("show");
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("modal").addEventListener("click", (e) => {
+    if (e.target.id === "modal") closeModal();
+  });
+
+  document.getElementById("popup").addEventListener("click", (e) => {
+    if (e.target.id === "popup") closePopup();
+  });
+});
